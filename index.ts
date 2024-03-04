@@ -49,6 +49,16 @@ function spawnProcess(
   });
 }
 
+export const validateAuthToken = (req: Request) => {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return false;
+
+  const token = authHeader.split(" ")[1];
+  if (token !== process.env.SECRET) return false;
+
+  return true;
+};
+
 const main = async () => {
   Bun.serve({
     port: 42069,
@@ -57,7 +67,12 @@ const main = async () => {
       if (url.pathname === "/") return new Response("Home page!");
       if (url.pathname === "/speak") {
         if (req.method !== "POST")
-          return new Response("use post damnit", {
+          return new Response("wrong method", {
+            status: 405,
+          });
+
+        if (!validateAuthToken(req))
+          return new Response("invalid auth token", {
             status: 401,
           });
 
