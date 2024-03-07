@@ -6,47 +6,88 @@ import fs from "fs";
 const SpeakParams = z.object({
   text: z.string(),
   speaker: z.number().optional(),
+  // stream: z.boolean().optional().default(false),
 });
 
-function spawnProcess(
+function spawnProcessStream(
   command: string,
   args: string[] = [],
   inputData?: string
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const process = spawn(command, args);
+): ReadableStream {
+  const process = spawn(command, args);
 
-    let stdoutData: string = "";
-    let stderrData: string = "";
+  if (inputData !== undefined) {
+    process.stdin.write(inputData);
+    process.stdin.end();
+  }
 
-    process.stdout.on("data", (data: Buffer) => {
-      stdoutData += data.toString();
-    });
+  const ffmpegProcess = spawn("ffmpeg", [
+    "-f",
+    "s16le",
+    "-ar",
+    "22050",
+    "-ac",
+    "1",
+    "-i",
+    "-",
+    "-acodec",
+    "libmp3lame",
+    "-q:a",
+    "2",
+    "-f",
+    "mp3",
+    "-",
+  ]);
 
-    process.stderr.on("data", (data: Buffer) => {
-      stderrData += data.toString();
-    });
+  process.stdout.pipe(ffmpegProcess.stdin);
 
-    process.on("close", (code: number) => {
-      if (code === 0) {
-        resolve(stdoutData);
-      } else {
-        reject(
-          new Error(`Process exited with code ${code}\nstderr: ${stderrData}`)
-        );
-      }
-    });
+  let isControllerClosed = false; // Flag to track if the controller has been closed
 
-    process.on("error", (error: Error) => {
-      reject(error);
-    });
-
-    // If inputData is provided, write it to the stdin of the process
-    if (inputData !== undefined) {
-      process.stdin.write(inputData);
-      process.stdin.end(); // Ensure to close the stdin to signal that no more data will be written
-    }
+  const webStream = new ReadableStream({
+    start(controller) {
+      ffmpegProcess.stdout.on("data", (chunk) => {
+        controller.enqueue(new Uint8Array(chunk));
+      });
+      ffmpegProcess.stdout.on("end", () => {
+        if (!isControllerClosed) {
+          controller.close();
+          isControllerClosed = true; // Set flag to indicate the controller is closed
+        }
+      });
+      ffmpegProcess.stderr.on("data", (data) => {
+        // console.error(`ffmpeg stderr: ${data}`);
+      });
+      ffmpegProcess.on("error", (err) => {
+        console.error(`ffmpeg process error: ${err}`);
+        if (!isControllerClosed) {
+          controller.error(err); // Properly signal an error to the stream
+          isControllerClosed = true; // Set flag to indicate the controller is closed
+        }
+      });
+      ffmpegProcess.on("close", (code) => {
+        if (code !== 0) {
+          console.error(`ffmpeg process exited with code ${code}`);
+          if (!isControllerClosed) {
+            controller.error(
+              new Error(`ffmpeg process exited with code ${code}`)
+            );
+            isControllerClosed = true; // Set flag to indicate the controller is closed
+          }
+        } else {
+          if (!isControllerClosed) {
+            controller.close(); // Only close the controller when the process exits successfully
+            isControllerClosed = true; // Set flag to indicate the controller is closed
+          }
+        }
+      });
+    },
+    cancel(reason) {
+      console.log(`Stream canceled with reason: ${reason}`);
+      ffmpegProcess.kill(); // Ensure the ffmpeg process is terminated if the stream is canceled
+    },
   });
+
+  return webStream;
 }
 
 export const validateAuthToken = (req: Request) => {
@@ -61,7 +102,7 @@ export const validateAuthToken = (req: Request) => {
 
 const main = async () => {
   Bun.serve({
-    port: 42069,
+    port: process.env.PORT || 42069,
     async fetch(req) {
       const url = new URL(req.url);
       if (url.pathname === "/") return new Response("Home page!");
@@ -80,34 +121,37 @@ const main = async () => {
         console.log(body);
 
         const { text, speaker } = SpeakParams.parse(body);
-        console.log("put in", text, speaker);
-        const uuid = uuidv4();
-        const filename = `${uuid}.wav`;
+        // const uuid = uuidv4();
+        // const filename = `${uuid}.wav`;
 
         const tStart = Date.now();
-        const r = await spawnProcess(
+        const stream = await spawnProcessStream(
           "piper",
           [
             "--model",
             "/home/cj/models/piper/semaine-medium.onnx",
+            "--use-cuda",
+            "--output-raw",
             "--json-input",
           ],
-          JSON.stringify({ text, speaker, output_file: filename })
+          JSON.stringify({ text, speaker })
         );
         console.log("Took", Date.now() - tStart, "ms");
+        // stream.
 
-        const response = new Response(Bun.file(filename), {
+        const response = new Response(stream, {
           headers: {
-            "Content-Type": "audio/wav",
+            "Content-Type": "audio/mpeg",
+            "Transfer-Encoding": "chunked",
           },
         });
 
-        fs.unlink(filename, (err) => {
-          if (err) {
-            console.error(err);
-            return;
-          }
-        });
+        // fs.unlink(filename, (err) => {
+        //   if (err) {
+        //     console.error(err);
+        //     return;
+        //   }
+        // });
 
         return response;
       }
