@@ -1,11 +1,19 @@
 import z from "zod";
 import { spawn } from "child_process";
-import { v4 as uuidv4 } from "uuid";
-import fs from "fs";
+
+const SpeakerModels = z.enum([
+  "semaine-medium",
+  // "joe-medium",
+  "ryan-medium",
+  // "hfc_male-medium",
+]);
 
 const SpeakParams = z.object({
   text: z.string(),
+  model: SpeakerModels.optional().default("semaine-medium"),
   speaker: z.number().optional(),
+  speed: z.number().optional().default(1.0),
+  sentenceSilence: z.number().optional().default(0.2),
   // stream: z.boolean().optional().default(false),
 });
 
@@ -120,7 +128,8 @@ const main = async () => {
         const body = await req.json();
         console.log(body);
 
-        const { text, speaker } = SpeakParams.parse(body);
+        const { text, speaker, model, speed, sentenceSilence } =
+          SpeakParams.parse(body);
         // const uuid = uuidv4();
         // const filename = `${uuid}.wav`;
 
@@ -129,9 +138,12 @@ const main = async () => {
           "piper",
           [
             "--model",
-            "/home/cj/models/piper/semaine-medium.onnx",
-            "--use-cuda",
+            `${process.env.MODEL_PATH}/${model}.onnx`,
             "--output-raw",
+            "--length_scale",
+            `${speed}`,
+            "--sentence-silence",
+            `${sentenceSilence}`,
             "--json-input",
           ],
           JSON.stringify({ text, speaker })
