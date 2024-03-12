@@ -7,72 +7,116 @@ const SpeakerModels = z.enum([
   "ryan-medium",
   // "hfc_male-medium",
 ]);
+type SpeakerModels = z.infer<typeof SpeakerModels>;
 
-const SpeakParams = z.object({
+const OutputFormats = z.enum(["mp3", "wav", "pcm"]);
+type OutputFormat = z.infer<typeof OutputFormats>;
+
+const SpeakParamsSchema = z.object({
   text: z.string(),
   model: SpeakerModels.optional().default("semaine-medium"),
   speaker: z.number().optional(),
   speed: z.number().optional().default(1.0),
   sentenceSilence: z.number().optional().default(0.2),
-  // stream: z.boolean().optional().default(false),
+  format: OutputFormats.optional().default("mp3"),
 });
+type SpeakParams = z.infer<typeof SpeakParamsSchema>;
 
-function spawnProcessStream(
-  command: string,
-  args: string[] = [],
-  inputData?: string
-): ReadableStream {
-  const process = spawn(command, args);
-
-  if (inputData !== undefined) {
-    process.stdin.write(inputData);
-    process.stdin.end();
+const getCodec = (format: OutputFormat) => {
+  switch (format) {
+    case "mp3":
+      return "libmp3lame";
+    case "wav":
+      return "pcm_s16le";
+    case "pcm":
+      return "pcm_s16le";
   }
+};
 
-  const ffmpegProcess = spawn("ffmpeg", [
-    "-f",
-    "s16le",
-    "-ar",
-    "22050",
-    "-ac",
-    "1",
-    "-i",
-    "-",
-    "-acodec",
-    "libmp3lame",
-    "-q:a",
-    "2",
-    "-f",
-    "mp3",
-    "-",
+function spawnProcessStream({
+  model,
+  speed,
+  sentenceSilence,
+  text,
+  speaker,
+  format,
+}: SpeakParams): ReadableStream {
+  const startTime = Date.now();
+  let chunkSent = false;
+
+  let outputProcess = spawn("piper", [
+    "--model",
+    `${process.env.MODEL_PATH}/${model}.onnx`,
+    "--output-raw",
+    "--length_scale",
+    `${speed}`,
+    "--sentence-silence",
+    `${sentenceSilence}`,
+    "--json-input",
   ]);
 
-  process.stdout.pipe(ffmpegProcess.stdin);
+  const input = JSON.stringify({ text, speaker });
+
+  outputProcess.stdin.write(input);
+  outputProcess.stdin.end();
+
+  if (format !== "pcm") {
+    // console.log("Using ffmpeg to convert to", format);
+    const ffmpegProcess = spawn("ffmpeg", [
+      "-f",
+      "s16le",
+      "-ar",
+      "22050",
+      "-ac",
+      "1",
+      "-i",
+      "-",
+      "-acodec",
+      getCodec(format),
+      "-q:a",
+      "2",
+      "-f",
+      format,
+      "-",
+    ]);
+
+    outputProcess.stdout.pipe(ffmpegProcess.stdin);
+    outputProcess = ffmpegProcess;
+  }
 
   let isControllerClosed = false; // Flag to track if the controller has been closed
 
   const webStream = new ReadableStream({
     start(controller) {
-      ffmpegProcess.stdout.on("data", (chunk) => {
+      outputProcess.stdout.on("data", (chunk) => {
+        if (!chunkSent) {
+          console.log("Took", Date.now() - startTime, "ms for the first chunk");
+          chunkSent = true;
+        }
         controller.enqueue(new Uint8Array(chunk));
       });
-      ffmpegProcess.stdout.on("end", () => {
+      outputProcess.stdout.on("end", () => {
         if (!isControllerClosed) {
           controller.close();
           isControllerClosed = true; // Set flag to indicate the controller is closed
+          // console.log(
+          //   "Took",
+          //   Date.now() - startTime,
+          //   "ms for the stream to end"
+          // );
         }
       });
-      ffmpegProcess.stderr.on("data", (data) => {
+      outputProcess.stderr.on("data", (data) => {
         // console.error(`ffmpeg stderr: ${data}`);
       });
-      ffmpegProcess.on("error", (err) => {
+      outputProcess.on("error", (err) => {
         console.error(`ffmpeg process error: ${err}`);
         if (!isControllerClosed) {
           controller.error(err); // Properly signal an error to the stream
           isControllerClosed = true; // Set flag to indicate the controller is closed
         }
       });
-      ffmpegProcess.on("close", (code) => {
+      outputProcess.on("close", (code) => {
         if (code !== 0) {
           console.error(`ffmpeg process exited with code ${code}`);
           if (!isControllerClosed) {
@@ -91,7 +135,7 @@ function spawnProcessStream(
     },
     cancel(reason) {
       console.log(`Stream canceled with reason: ${reason}`);
-      ffmpegProcess.kill(); // Ensure the ffmpeg process is terminated if the stream is canceled
+      outputProcess.kill(); // Ensure the ffmpeg process is terminated if the stream is canceled
     },
   });
 
@@ -126,29 +170,14 @@ const main = async () => {
           });
 
         const body = await req.json();
-        console.log(body);
 
-        const { text, speaker, model, speed, sentenceSilence } =
-          SpeakParams.parse(body);
+        const params = SpeakParamsSchema.parse(body);
         // const uuid = uuidv4();
         // const filename = `${uuid}.wav`;
 
         const tStart = Date.now();
-        const stream = await spawnProcessStream(
-          "piper",
-          [
-            "--model",
-            `${process.env.MODEL_PATH}/${model}.onnx`,
-            "--output-raw",
-            "--length_scale",
-            `${speed}`,
-            "--sentence-silence",
-            `${sentenceSilence}`,
-            "--json-input",
-          ],
-          JSON.stringify({ text, speaker })
-        );
-        console.log("Took", Date.now() - tStart, "ms");
+        const stream = await spawnProcessStream(params);
+        // console.log("Took", Date.now() - tStart, "ms");
         // stream.
 
         const response = new Response(stream, {
