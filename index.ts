@@ -1,26 +1,9 @@
-import z from "zod";
 import { spawn } from "child_process";
-
-const SpeakerModels = z.enum([
-  "semaine-medium",
-  // "joe-medium",
-  "ryan-medium",
-  // "hfc_male-medium",
-]);
-type SpeakerModels = z.infer<typeof SpeakerModels>;
-
-const OutputFormats = z.enum(["mp3", "wav", "pcm"]);
-type OutputFormat = z.infer<typeof OutputFormats>;
-
-const SpeakParamsSchema = z.object({
-  text: z.string(),
-  model: SpeakerModels.optional().default("semaine-medium"),
-  speaker: z.number().optional(),
-  speed: z.number().optional().default(1.0),
-  sentenceSilence: z.number().optional().default(0.2),
-  format: OutputFormats.optional().default("mp3"),
-});
-type SpeakParams = z.infer<typeof SpeakParamsSchema>;
+import {
+  SpeakParamsSchema,
+  type OutputFormat,
+  type SpeakParams,
+} from "./src/api";
 
 const getCodec = (format: OutputFormat) => {
   switch (format) {
@@ -152,50 +135,40 @@ export const validateAuthToken = (req: Request) => {
   return true;
 };
 
+const handleSpeakRequest = async (req: Request) => {
+  if (req.method !== "POST")
+    return new Response("wrong method", {
+      status: 405,
+    });
+
+  if (!validateAuthToken(req))
+    return new Response("invalid auth token", {
+      status: 401,
+    });
+
+  const body = await req.json();
+
+  const params = SpeakParamsSchema.parse(body);
+  const stream = await spawnProcessStream(params);
+
+  const response = new Response(stream, {
+    headers: {
+      "Content-Type": "audio/mpeg",
+      "Transfer-Encoding": "chunked",
+    },
+  });
+
+  return response;
+};
+
 const main = async () => {
   Bun.serve({
     port: process.env.PORT || 42069,
     async fetch(req) {
       const url = new URL(req.url);
       if (url.pathname === "/") return new Response("Home page!");
-      if (url.pathname === "/speak") {
-        if (req.method !== "POST")
-          return new Response("wrong method", {
-            status: 405,
-          });
+      if (url.pathname === "/speak") return handleSpeakRequest(req);
 
-        if (!validateAuthToken(req))
-          return new Response("invalid auth token", {
-            status: 401,
-          });
-
-        const body = await req.json();
-
-        const params = SpeakParamsSchema.parse(body);
-        // const uuid = uuidv4();
-        // const filename = `${uuid}.wav`;
-
-        const tStart = Date.now();
-        const stream = await spawnProcessStream(params);
-        // console.log("Took", Date.now() - tStart, "ms");
-        // stream.
-
-        const response = new Response(stream, {
-          headers: {
-            "Content-Type": "audio/mpeg",
-            "Transfer-Encoding": "chunked",
-          },
-        });
-
-        // fs.unlink(filename, (err) => {
-        //   if (err) {
-        //     console.error(err);
-        //     return;
-        //   }
-        // });
-
-        return response;
-      }
       return new Response("404!");
     },
   });
