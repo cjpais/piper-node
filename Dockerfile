@@ -31,7 +31,8 @@ RUN apt update && apt install -y ffmpeg && apt clean && rm -rf /var/lib/apt/list
 COPY --from=dependencies /temp/prod/node_modules /usr/src/app/node_modules
 COPY --from=piper_installer /usr/local/bin/piper /usr/local/bin/
 COPY --from=piper_installer /models /models
-# Copy only necessary source files
+
+COPY src/ ./src/
 COPY index.ts package.json ./
 
 USER bun
