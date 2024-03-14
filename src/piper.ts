@@ -36,6 +36,16 @@ export const generatePiperSpeech = ({
 
   const input = JSON.stringify({ text, speaker });
 
+  console.log("num characters", text.length);
+  outputProcess.stderr.on("data", (data) => {
+    if (
+      data.toString().includes("Real-time") ||
+      data.toString().includes("Loaded voice")
+    ) {
+      console.log(data.toString());
+    }
+  });
+
   outputProcess.stdin.write(input);
   outputProcess.stdin.end();
 
