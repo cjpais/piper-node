@@ -11,6 +11,8 @@ const getCodec = (format: OutputFormat) => {
       return "pcm_s16le";
     case "pcm":
       return "pcm_s16le";
+    case "ogg":
+      return "libvorbis";
   }
 };
 

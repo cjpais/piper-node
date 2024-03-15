@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SpeakParamsSchema, SpeakerModels } from "./src/api";
+import { SpeakParamsSchema, SpeakerModels, type OutputFormat } from "./src/api";
 import { generateSpeech } from "./src/piper";
 import { PiperVoice, phonemize } from "./src/runtime/run";
 
@@ -11,6 +11,19 @@ export const validateAuthToken = (req: Request) => {
   if (token !== process.env.SECRET) return false;
 
   return true;
+};
+
+const getContentType = (format: OutputFormat) => {
+  switch (format) {
+    case "mp3":
+      return "audio/mpeg";
+    case "wav":
+      return "audio/wav";
+    case "pcm":
+      return "audio/x-raw";
+    case "ogg":
+      return "audio/ogg";
+  }
 };
 
 const handleSpeakRequest = async (req: Request) => {
@@ -31,7 +44,7 @@ const handleSpeakRequest = async (req: Request) => {
 
   const response = new Response(stream, {
     headers: {
-      "Content-Type": "audio/mpeg", // TODO set proper content type based on format
+      "Content-Type": getContentType(params.format),
       "Transfer-Encoding": "chunked",
     },
   });

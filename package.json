@@ -3,6 +3,7 @@
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
+    "@cjpais/inference": "^0.0.12",
     "@types/bun": "latest",
     "@types/uuid": "^9.0.8"
   },

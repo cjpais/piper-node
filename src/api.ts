@@ -7,7 +7,7 @@ export type SpeakerModels = z.infer<typeof SpeakerModels>;
 export const QualityLevels = z.enum(["low", "medium", "high"]);
 export type QualityLevel = z.infer<typeof QualityLevels>;
 
-export const OutputFormats = z.enum(["mp3", "wav", "pcm"]);
+export const OutputFormats = z.enum(["mp3", "wav", "pcm", "ogg"]);
 export type OutputFormat = z.infer<typeof OutputFormats>;
 
 export const SpeakParamsSchema = z.object({
