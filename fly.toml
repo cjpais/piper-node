@@ -18,10 +18,10 @@ primary_region = 'lax'
   processes = ['app']
   [http_service.concurrency]
     type = "requests"
-    hard_limit = 5
+    hard_limit = 10
     soft_limit = 1
 
 [[vm]]
-  memory = '512mb'
+  memory = '1gb'
   cpu_kind = 'shared'
-  cpus = 2
+  cpus = 4

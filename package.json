@@ -7,13 +7,15 @@
     "@types/uuid": "^9.0.8"
   },
   "scripts": {
-    "dev": "export PORT=53097 && bun --watch index.ts",
+    "dev": "export PORT=53098 && bun --watch index.ts",
+    "staging": "export PORT=53097 && bun index.ts",
     "server": "export PORT=42069 && bun index.ts"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "onnxruntime-node": "^1.17.0",
     "uuid": "^9.0.1",
     "zod": "^3.22.4"
   }
