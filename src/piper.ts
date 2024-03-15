@@ -39,14 +39,28 @@ export const generateSpeech = ({
       "-",
       "-acodec",
       getCodec(format),
-      "-q:a",
-      "2",
       "-f",
       format,
       "-",
     ]);
 
-    Readable.fromWeb(pcmStream).pipe(ffmpegProcess.stdin);
-    return Readable.toWeb(ffmpegProcess.stdout);
+    async function writeInputToFFmpeg() {
+      for await (const chunk of pcmStream) {
+        ffmpegProcess.stdin.write(Buffer.from(chunk));
+      }
+      ffmpegProcess.stdin.end();
+    }
+    writeInputToFFmpeg();
+
+    const ouputStream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of ffmpegProcess.stdout) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      },
+    });
+
+    return ouputStream;
   }
 };

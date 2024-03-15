@@ -72,8 +72,7 @@ const synthesizeStream = (
   if (sentences[sentences.length - 1] === "") sentences.pop();
 
   console.log("sentences", sentences);
-  const stream = new ReadableStream<Int16Array>({
-    type: "direct",
+  const stream = new ReadableStream({
     async pull(controller) {
       for (let i = 0; i < sentences.length; i++) {
         let sentence = sentences[i];
@@ -128,7 +127,7 @@ const synthesizeStream = (
           Date.now() - startTime,
           "ms"
         );
-        controller.write(pcm);
+        controller.enqueue(pcm.buffer);
       }
       controller.close();
     },
