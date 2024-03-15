@@ -16,7 +16,6 @@ RUN mkdir -p /temp/dev /temp/prod && \
 
 # Install piper and models in a single layer to reduce image size
 FROM base AS piper_installer
-ENV PIPER_PHONEMIZE_VERSION=2023.11.14-4
 RUN apt update && apt install -y curl tar && \
     arch="" && \
     case "${TARGETPLATFORM}" in \
@@ -25,10 +24,9 @@ RUN apt update && apt install -y curl tar && \
     "linux/arm/v7") arch="linux_armv7l" ;; \
     *) echo "Unsupported platform: ${TARGETPLATFORM}" && exit 1 ;; \
     esac && \
-    echo "Downloading piper-phonemize ${PIPER_PHONEMIZE_VERSION} for ${arch}" && \
-    curl -L https://github.com/rhasspy/piper-phonemize/releases/download/${PIPER_PHONEMIZE_VERSION}/piper-phonemize_${arch}.tar.gz -o piper-phonemize.tar.gz && \
-    tar -xvf piper-phonemize.tar.gz -C /usr/local/bin && \
-    rm piper-phonemize.tar.gz && \
+    curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_${arch}.tar.gz -o piper.tar.gz && \
+    tar -xvf piper.tar.gz -C /usr/local/bin && \
+    rm piper.tar.gz && \
     mkdir /models && \
     curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx?download=true" -o /models/ryan-medium.onnx && \
     curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx.json?download=true" -o /models/ryan-medium.onnx.json && \

@@ -12,11 +12,11 @@ const PhonemizeSchema = z.object({
 export const phonemize = async (text: string, lang: string = "en-us") => {
   const p = Bun.spawn(
     [
-      "piper_phonemize",
+      "/usr/local/bin/piper_phonemize",
       "-l",
       lang,
       "--espeak-data",
-      "/usr/local/bin/share/espeak-ng-data",
+      "/usr/local/bin/espeak-ng-data",
     ],
     {
       stdin: Buffer.from(text),
