@@ -135,14 +135,36 @@ const synthesizeStream = (
   return stream;
 };
 
-function convertFloat32ToInt16(buffer: Float32Array) {
+function convertFloat32ToInt16(
+  buffer: Float32Array,
+  maxWavValue: number = 32767
+) {
   let l = buffer.length;
   let buf = new Int16Array(l);
 
-  while (l--) {
-    // Scale the float32 value (-1.0 to 1.0) to int16 range and clamp the values
-    let s = Math.max(-1, Math.min(1, buffer[l]));
-    buf[l] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  // Calculate the maximum absolute value in the buffer
+  let maxAbsValue = 0;
+  for (let i = 0; i < l; i++) {
+    if (Math.abs(buffer[i]) > maxAbsValue) {
+      maxAbsValue = Math.abs(buffer[i]);
+    }
+  }
+
+  // Avoid division by zero or very low max values (similar to max(0.01, ...))
+  let normalizationFactor = maxWavValue / Math.max(0.01, maxAbsValue);
+
+  for (let i = 0; i < l; i++) {
+    // Normalize based on the maximum value, similar to the Python version
+    let normalizedSample = buffer[i] * normalizationFactor;
+
+    // Clip the values to ensure they are within the int16 range
+    normalizedSample = Math.max(
+      -maxWavValue,
+      Math.min(maxWavValue, normalizedSample)
+    );
+
+    // Convert to int16
+    buf[i] = Math.round(normalizedSample);
   }
 
   return buf;
