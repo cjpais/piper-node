@@ -15,11 +15,8 @@ RUN mkdir -p /temp/dev /temp/prod && \
 # Install piper and models in a single layer to reduce image size
 FROM base AS piper_installer
 RUN apt update && apt install -y curl tar && \
-    curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz -o piper.tar.gz && \
     curl -L https://github.com/rhasspy/piper-phonemize/releases/download/2023.11.14-4/piper-phonemize_linux_x86_64.tar.gz -o piper-phonemize.tar.gz && \
-    tar -xvf piper.tar.gz -C /usr/local/bin && \
     tar -xvf piper-phonemize.tar.gz -C /usr/local/bin && \
-    rm piper.tar.gz && \
     rm piper-phonemize.tar.gz && \
     mkdir /models && \
     curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx?download=true" -o /models/ryan-medium.onnx && \
@@ -33,9 +30,7 @@ FROM base AS release
 RUN apt update && apt install -y ffmpeg && apt clean && rm -rf /var/lib/apt/lists/*
 COPY --from=dependencies /temp/prod/node_modules /usr/src/app/node_modules
 COPY --from=piper_installer /usr/local/bin/* /usr/local/bin/
-# COPY --from=piper_installer /usr/local/bin/piper-phonemize /usr/local/bin/
 COPY --from=piper_installer /models /models
-# COPY /usr/local/bin/share/espeak-ng-data /usr/share
 
 COPY src/ ./src/
 COPY index.ts package.json ./
@@ -45,4 +40,3 @@ EXPOSE 3000/tcp
 ENV PORT=3000
 ENV MODEL_PATH=/models
 ENTRYPOINT ["bun", "run", "index.ts"]
-# ENTRYPOINT [ "/bin/bash" ]
