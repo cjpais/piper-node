@@ -1,6 +1,5 @@
 // @ts-ignore
 import * as ort from "onnxruntime-node";
-import fs from "fs";
 import { z } from "zod";
 
 const PhonemizeSchema = z.object({
@@ -55,12 +54,12 @@ export class PiperVoice {
     });
   }
 
-  async synthesize(text: string, speaker: number = 0, speed?: number) {
+  synthesize(text: string, speaker: number = 0, speed?: number) {
     return synthesizeStream(text, speaker, this.config, this.session, speed);
   }
 }
 
-const synthesizeStream = async (
+const synthesizeStream = (
   text: string,
   speaker: number = 0,
   config: any,
@@ -131,6 +130,7 @@ const synthesizeStream = async (
         );
         controller.write(pcm);
       }
+      controller.close();
     },
   });
   return stream;
