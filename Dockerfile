@@ -2,6 +2,8 @@
 FROM oven/bun:slim as base
 WORKDIR /usr/src/app
 
+ARG TARGETPLATFORM
+
 # Bundle install steps to reduce layers, using a single RUN command where possible
 FROM base AS dependencies
 COPY package.json bun.lockb ./
@@ -14,8 +16,17 @@ RUN mkdir -p /temp/dev /temp/prod && \
 
 # Install piper and models in a single layer to reduce image size
 FROM base AS piper_installer
+ENV PIPER_PHONEMIZE_VERSION=2023.11.14-4
 RUN apt update && apt install -y curl tar && \
-    curl -L https://github.com/rhasspy/piper-phonemize/releases/download/2023.11.14-4/piper-phonemize_linux_x86_64.tar.gz -o piper-phonemize.tar.gz && \
+    arch="" && \
+    case "${TARGETPLATFORM}" in \
+    "linux/amd64") arch="linux_x86_64" ;; \
+    "linux/arm64") arch="linux_aarch64" ;; \
+    "linux/arm/v7") arch="linux_armv7l" ;; \
+    *) echo "Unsupported platform: ${TARGETPLATFORM}" && exit 1 ;; \
+    esac && \
+    echo "Downloading piper-phonemize ${PIPER_PHONEMIZE_VERSION} for ${arch}" && \
+    curl -L https://github.com/rhasspy/piper-phonemize/releases/download/${PIPER_PHONEMIZE_VERSION}/piper-phonemize_${arch}.tar.gz -o piper-phonemize.tar.gz && \
     tar -xvf piper-phonemize.tar.gz -C /usr/local/bin && \
     rm piper-phonemize.tar.gz && \
     mkdir /models && \
