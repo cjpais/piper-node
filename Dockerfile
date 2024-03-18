@@ -2,6 +2,8 @@
 FROM oven/bun:slim as base
 WORKDIR /usr/src/app
 
+ARG TARGETPLATFORM
+
 # Bundle install steps to reduce layers, using a single RUN command where possible
 FROM base AS dependencies
 COPY package.json bun.lockb ./
@@ -15,7 +17,14 @@ RUN mkdir -p /temp/dev /temp/prod && \
 # Install piper and models in a single layer to reduce image size
 FROM base AS piper_installer
 RUN apt update && apt install -y curl tar && \
-    curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz -o piper.tar.gz && \
+    arch="" && \
+    case "${TARGETPLATFORM}" in \
+    "linux/amd64") arch="linux_x86_64" ;; \
+    "linux/arm64") arch="linux_aarch64" ;; \
+    "linux/arm/v7") arch="linux_armv7l" ;; \
+    *) echo "Unsupported platform: ${TARGETPLATFORM}" && exit 1 ;; \
+    esac && \
+    curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_${arch}.tar.gz -o piper.tar.gz && \
     tar -xvf piper.tar.gz -C /usr/local/bin && \
     rm piper.tar.gz && \
     mkdir /models && \
@@ -29,7 +38,7 @@ FROM base AS release
 # Combine apt update and install commands, and clean up in the same layer to reduce size
 RUN apt update && apt install -y ffmpeg && apt clean && rm -rf /var/lib/apt/lists/*
 COPY --from=dependencies /temp/prod/node_modules /usr/src/app/node_modules
-COPY --from=piper_installer /usr/local/bin/piper /usr/local/bin/
+COPY --from=piper_installer /usr/local/bin/* /usr/local/bin/
 COPY --from=piper_installer /models /models
 
 COPY src/ ./src/

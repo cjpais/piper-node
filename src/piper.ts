@@ -1,5 +1,7 @@
+import { voices } from "..";
 import type { OutputFormat, SpeakParams } from "./api";
 import { spawn } from "child_process";
+import { Readable } from "stream";
 
 const getCodec = (format: OutputFormat) => {
   switch (format) {
@@ -9,10 +11,12 @@ const getCodec = (format: OutputFormat) => {
       return "pcm_s16le";
     case "pcm":
       return "pcm_s16le";
+    case "ogg":
+      return "libvorbis";
   }
 };
 
-export const generatePiperSpeech = ({
+export const generateSpeech = ({
   model,
   speed,
   sentenceSilence,
@@ -20,27 +24,12 @@ export const generatePiperSpeech = ({
   speaker,
   format,
 }: SpeakParams): ReadableStream => {
-  const startTime = Date.now();
-  let chunkSent = false;
+  const voice = voices[model];
+  const pcmStream: ReadableStream = voice.synthesize(text, speaker, speed);
 
-  let outputProcess = spawn("piper", [
-    "--model",
-    `${process.env.MODEL_PATH}/${model}.onnx`,
-    "--output-raw",
-    "--length_scale",
-    `${speed}`,
-    "--sentence-silence",
-    `${sentenceSilence}`,
-    "--json-input",
-  ]);
-
-  const input = JSON.stringify({ text, speaker });
-
-  outputProcess.stdin.write(input);
-  outputProcess.stdin.end();
-
-  if (format !== "pcm") {
-    // console.log("Using ffmpeg to convert to", format);
+  if (format === "pcm") {
+    return pcmStream;
+  } else {
     const ffmpegProcess = spawn("ffmpeg", [
       "-f",
       "s16le",
@@ -52,71 +41,28 @@ export const generatePiperSpeech = ({
       "-",
       "-acodec",
       getCodec(format),
-      "-q:a",
-      "2",
       "-f",
       format,
       "-",
     ]);
 
-    outputProcess.stdout.pipe(ffmpegProcess.stdin);
-    outputProcess = ffmpegProcess;
+    async function writeInputToFFmpeg() {
+      for await (const chunk of pcmStream) {
+        ffmpegProcess.stdin.write(Buffer.from(chunk));
+      }
+      ffmpegProcess.stdin.end();
+    }
+    writeInputToFFmpeg();
+
+    const ouputStream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of ffmpegProcess.stdout) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      },
+    });
+
+    return ouputStream;
   }
-
-  let isControllerClosed = false; // Flag to track if the controller has been closed
-
-  const webStream = new ReadableStream({
-    start(controller) {
-      outputProcess.stdout.on("data", (chunk) => {
-        if (!chunkSent) {
-          console.log("Took", Date.now() - startTime, "ms for the first chunk");
-          chunkSent = true;
-        }
-        controller.enqueue(new Uint8Array(chunk));
-      });
-      outputProcess.stdout.on("end", () => {
-        if (!isControllerClosed) {
-          controller.close();
-          isControllerClosed = true; // Set flag to indicate the controller is closed
-          // console.log(
-          //   "Took",
-          //   Date.now() - startTime,
-          //   "ms for the stream to end"
-          // );
-        }
-      });
-      outputProcess.stderr.on("data", (data) => {
-        // console.error(`ffmpeg stderr: ${data}`);
-      });
-      outputProcess.on("error", (err) => {
-        console.error(`ffmpeg process error: ${err}`);
-        if (!isControllerClosed) {
-          controller.error(err); // Properly signal an error to the stream
-          isControllerClosed = true; // Set flag to indicate the controller is closed
-        }
-      });
-      outputProcess.on("close", (code) => {
-        if (code !== 0) {
-          console.error(`ffmpeg process exited with code ${code}`);
-          if (!isControllerClosed) {
-            controller.error(
-              new Error(`ffmpeg process exited with code ${code}`)
-            );
-            isControllerClosed = true; // Set flag to indicate the controller is closed
-          }
-        } else {
-          if (!isControllerClosed) {
-            controller.close(); // Only close the controller when the process exits successfully
-            isControllerClosed = true; // Set flag to indicate the controller is closed
-          }
-        }
-      });
-    },
-    cancel(reason) {
-      console.log(`Stream canceled with reason: ${reason}`);
-      outputProcess.kill(); // Ensure the ffmpeg process is terminated if the stream is canceled
-    },
-  });
-
-  return webStream;
 };
