@@ -18,5 +18,6 @@ export const SpeakParamsSchema = z.object({
   speed: z.number().optional().default(1.0),
   sentenceSilence: z.number().optional().default(0.2),
   format: OutputFormats.optional().default("mp3"),
+  pitch: z.number().optional().default(1),
 });
 export type SpeakParams = z.infer<typeof SpeakParamsSchema>;

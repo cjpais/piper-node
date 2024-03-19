@@ -6,14 +6,35 @@ import { Readable } from "stream";
 const getCodec = (format: OutputFormat) => {
   switch (format) {
     case "mp3":
-      return "libmp3lame";
+      return ["libmp3lame"];
     case "wav":
-      return "pcm_s16le";
+      return ["pcm_s16le"];
     case "pcm":
-      return "pcm_s16le";
+      return ["pcm_s16le"];
     case "ogg":
-      return "libvorbis";
+      return ["libvorbis"];
   }
+};
+
+const getOutputFormat = (format: OutputFormat) => {
+  switch (format) {
+    case "mp3":
+      return ["mp3"];
+    case "wav":
+      return ["wav"];
+    case "pcm":
+      return ["s16le"];
+    case "ogg":
+      return ["ogg"];
+  }
+};
+
+const getFilters = ({ pitch }: { pitch: number }) => {
+  const filters = [];
+  if (pitch != 1) {
+    filters.push("-filter:a", `rubberband=pitch=${pitch}`);
+  }
+  return filters;
 };
 
 export const generateSpeech = ({
@@ -23,11 +44,12 @@ export const generateSpeech = ({
   text,
   speaker,
   format,
+  pitch,
 }: SpeakParams): ReadableStream => {
   const voice = voices[model];
   const pcmStream: ReadableStream = voice.synthesize(text, speaker, speed);
 
-  if (format === "pcm") {
+  if (format === "pcm" && pitch === 1) {
     return pcmStream;
   } else {
     const ffmpegProcess = spawn("ffmpeg", [
@@ -40,9 +62,10 @@ export const generateSpeech = ({
       "-i",
       "-",
       "-acodec",
-      getCodec(format),
+      ...getCodec(format),
       "-f",
-      format,
+      ...getOutputFormat(format),
+      ...getFilters({ pitch }),
       "-",
     ]);
 
