@@ -13,7 +13,11 @@ export const generateSpeech = ({
   pitch,
 }: SpeakParams): ReadableStream => {
   const voice = voices[model];
-  const pcmStream: ReadableStream = voice.synthesize(text, speaker, speed);
+  const pcmStream: ReadableStream = voice.synthesize(
+    text,
+    speaker,
+    1 + (1 - speed)
+  );
 
   if (format === "pcm" && pitch === 1) {
     return pcmStream;
