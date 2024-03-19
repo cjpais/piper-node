@@ -42,10 +42,10 @@ COPY --from=piper_installer /usr/local/bin/* /usr/local/bin/
 COPY --from=piper_installer /models /models
 
 COPY src/ ./src/
-COPY index.ts package.json ./
+COPY package.json ./
 
 USER bun
 EXPOSE 3000/tcp
 ENV PORT=3000
 ENV MODEL_PATH=/models
-ENTRYPOINT ["bun", "run", "index.ts"]
+ENTRYPOINT ["bun", "run", "src/index.ts"]

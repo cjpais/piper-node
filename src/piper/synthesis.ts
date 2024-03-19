@@ -1,65 +1,8 @@
 // @ts-ignore
 import * as ort from "onnxruntime-node";
-import { z } from "zod";
+import { phonemize } from ".";
 
-const PhonemizeSchema = z.object({
-  phoneme_ids: z.array(z.number()),
-  phonemes: z.array(z.string()),
-  processed_text: z.string(),
-  text: z.string(),
-});
-
-export const phonemize = async (text: string, lang: string = "en-us") => {
-  const p = Bun.spawn(
-    [
-      "/usr/local/bin/piper_phonemize",
-      "-l",
-      lang,
-      "--espeak-data",
-      "/usr/local/bin/espeak-ng-data",
-    ],
-    {
-      stdin: Buffer.from(text),
-    }
-  );
-
-  let chunks = [];
-  for await (const chunk of p.stdout) {
-    chunks.push(chunk);
-  }
-  const buffer = Buffer.concat(chunks);
-  const json = JSON.parse(buffer.toString());
-  const result = PhonemizeSchema.parse(json);
-
-  return result;
-};
-
-export class PiperVoice {
-  session: ort.InferenceSession;
-  configPath: string;
-  modelPath: string;
-  config: any;
-
-  constructor(modelPath: string) {
-    this.modelPath = modelPath;
-    this.configPath = `${modelPath}.json`;
-  }
-
-  async load() {
-    this.config = await Bun.file(this.configPath).json();
-    const providers = ["cpu"]; // add coreml, cuda if supported
-
-    this.session = await ort.InferenceSession.create(this.modelPath, {
-      executionProviders: providers,
-    });
-  }
-
-  synthesize(text: string, speaker: number = 0, speed?: number) {
-    return synthesizeStream(text, speaker, this.config, this.session, speed);
-  }
-}
-
-const synthesizeStream = (
+export const synthesizeStream = (
   text: string,
   speaker: number = 0,
   config: any,
