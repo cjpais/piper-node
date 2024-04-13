@@ -11,10 +11,12 @@ export const synthesizeStream = (
 ) => {
   // TODO split sentences via regex and add punctuation back properly.
   // TODO add delay between sentences
-  const sentences = text.split(".");
-  if (sentences[sentences.length - 1] === "") sentences.pop();
+  let sentences = text.split(/(?<=[.!?]\s)(?=\S)|(?<=[\n])/g);
+  sentences = sentences
+    .map((s) => s.replaceAll(/[^\x20-\x7E]/g, ""))
+    .filter((sentence) => sentence.length > 0);
 
-  console.log("sentences", sentences);
+  console.log("cleaned sentences: ", sentences);
   const stream = new ReadableStream({
     async pull(controller) {
       for (let i = 0; i < sentences.length; i++) {
