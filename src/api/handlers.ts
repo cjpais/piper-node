@@ -2,6 +2,7 @@ import { z } from "zod";
 import { SpeakParamsSchema, type OutputFormat } from ".";
 import { validateAuthToken } from "./middleware";
 import { generateSpeech, phonemize } from "../piper";
+import { devlog } from "../misc/utils";
 
 const getContentType = (format: OutputFormat) => {
   switch (format) {
@@ -17,15 +18,19 @@ const getContentType = (format: OutputFormat) => {
 };
 
 export const handleSpeakRequest = async (req: Request) => {
-  if (req.method !== "POST")
+  if (req.method !== "POST") {
+    devlog("wrong method");
     return new Response("wrong method", {
       status: 405,
     });
+  }
 
-  if (!validateAuthToken(req))
+  if (!validateAuthToken(req)) {
+    devlog("invalid auth token");
     return new Response("invalid auth token", {
       status: 401,
     });
+  }
 
   const body = await req.json();
 
