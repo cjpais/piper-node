@@ -16,7 +16,8 @@ export const generateSpeech = ({
   const pcmStream: ReadableStream = voice.synthesize(
     text,
     speaker,
-    1 + (1 - speed)
+    1 + (1 - speed),
+    sentenceSilence
   );
 
   if (format === "pcm" && pitch === 1) {

@@ -22,7 +22,19 @@ export class PiperVoice {
     });
   }
 
-  synthesize(text: string, speaker: number = 0, speed?: number) {
-    return synthesizeStream(text, speaker, this.config, this.session, speed);
+  synthesize(
+    text: string,
+    speaker: number = 0,
+    speed?: number,
+    sentenceSilence: number = 0
+  ) {
+    return synthesizeStream(
+      text,
+      speaker,
+      this.config,
+      this.session,
+      speed,
+      sentenceSilence
+    );
   }
 }

@@ -2,18 +2,20 @@
 import * as ort from "onnxruntime-node";
 import { phonemize } from ".";
 
+const SAMPLE_RATE = 16000;
+const SAMPLE_RATE_MS = SAMPLE_RATE / 1000;
+
 export const synthesizeStream = (
   text: string,
   speaker: number = 0,
   config: any,
   session: ort.InferenceSession,
-  speed?: number
+  speed?: number,
+  sentenceSilence: number = 0
 ) => {
-  // TODO split sentences via regex and add punctuation back properly.
-  // TODO add delay between sentences
   let sentences = text.split(/(?<=[.!?]\s)(?=\S)|(?<=[\n])/g);
   sentences = sentences
-    .map((s) => s.replaceAll(/[^\x20-\x7E]/g, ""))
+    .map((s) => s.replaceAll(/[^\x20-\x7E]/g, "").trim())
     .filter((sentence) => sentence.length > 0);
 
   console.log("cleaned sentences: ", sentences);
@@ -21,7 +23,6 @@ export const synthesizeStream = (
     async pull(controller) {
       for (let i = 0; i < sentences.length; i++) {
         let sentence = sentences[i];
-        // console.log("Synthesizing", sentence, config.espeak.voice);
         const phonemeData = await phonemize(sentence, config.espeak.voice);
         const bigIntPhonemeIds = phonemeData.phoneme_ids.map((id) =>
           BigInt(id)
@@ -73,6 +74,14 @@ export const synthesizeStream = (
           "ms"
         );
         controller.enqueue(pcm.buffer);
+
+        // Add silence between sentences
+        if (i < sentences.length - 1) {
+          const silence = new Int16Array(
+            new Array(Math.round(sentenceSilence * SAMPLE_RATE_MS)).fill(0)
+          );
+          controller.enqueue(silence.buffer);
+        }
       }
       controller.close();
     },
