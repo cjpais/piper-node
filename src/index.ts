@@ -8,12 +8,15 @@ export const semaine = new PiperVoice(
 export const ryan = new PiperVoice(
   `${process.env.MODEL_PATH}/ryan-medium.onnx`
 );
+export const kim = new PiperVoice(`${process.env.MODEL_PATH}/kim.onnx`);
 semaine.load();
 ryan.load();
+kim.load();
 
 export const voices: Record<SpeakerModels, PiperVoice> = {
   semaine,
   ryan,
+  kim,
 };
 
 const main = async () => {

@@ -31,7 +31,9 @@ RUN apt update && apt install -y curl tar && \
     curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx?download=true" -o /models/ryan-medium.onnx && \
     curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx.json?download=true" -o /models/ryan-medium.onnx.json && \
     curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/semaine/medium/en_GB-semaine-medium.onnx?download=true" -o /models/semaine-medium.onnx && \
-    curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/semaine/medium/en_GB-semaine-medium.onnx.json?download=true" -o /models/semaine-medium.onnx.json
+    curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/semaine/medium/en_GB-semaine-medium.onnx.json?download=true" -o /models/semaine-medium.onnx.json \
+    curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx?download=true" -o /models/kim.onnx \
+    curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx.json?download=true" -o /models/kim.onnx.json
 
 # Final image: copy only the necessary files
 FROM base AS release

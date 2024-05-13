@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // TODO really need to rename or put in namespace
-export const SpeakerModels = z.enum(["semaine", "ryan"]);
+export const SpeakerModels = z.enum(["semaine", "ryan", "kim"]);
 export type SpeakerModels = z.infer<typeof SpeakerModels>;
 
 export const QualityLevels = z.enum(["low", "medium", "high"]);
