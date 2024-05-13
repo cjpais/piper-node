@@ -8,9 +8,7 @@
     "@types/uuid": "^9.0.8"
   },
   "scripts": {
-    "dev": "export PORT=53098 && bun --watch src/index.ts",
-    "staging": "export PORT=53097 && bun src/index.ts",
-    "server": "export PORT=42069 && bun src/index.ts"
+    "dev": "bun --watch src/index.ts"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

@@ -1,18 +1,9 @@
-# Use multi-stage builds to keep the final image as small as possible
 FROM oven/bun:slim as base
 WORKDIR /usr/src/app
 
 ARG TARGETPLATFORM
 
-# Bundle install steps to reduce layers, using a single RUN command where possible
-FROM base AS dependencies
-COPY package.json bun.lockb ./
-# Install both dev and prod dependencies in one step, then remove devDependencies later
-RUN mkdir -p /temp/dev /temp/prod && \
-    cp package.json bun.lockb /temp/dev/ && \
-    cp package.json bun.lockb /temp/prod/ && \
-    cd /temp/dev && bun install --frozen-lockfile && \
-    cd /temp/prod && bun install --frozen-lockfile --production
+RUN echo "Building for ${TARGETPLATFORM}"
 
 # Install piper and models in a single layer to reduce image size
 FROM base AS piper_installer
@@ -36,18 +27,16 @@ RUN apt update && apt install -y curl tar && \
     curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx.json?download=true" -o /models/kim.onnx.json
 
 # Final image: copy only the necessary files
-FROM base AS release
+FROM base AS dev
 # Combine apt update and install commands, and clean up in the same layer to reduce size
 RUN apt update && apt install -y ffmpeg && apt clean && rm -rf /var/lib/apt/lists/*
-COPY --from=dependencies /temp/prod/node_modules /usr/src/app/node_modules
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
 COPY --from=piper_installer /usr/local/bin/* /usr/local/bin/
 COPY --from=piper_installer /models /models
 
-COPY src/ ./src/
-COPY package.json ./
-
 USER bun
 EXPOSE 3000/tcp
-ENV PORT=3000
+ENV PORT=5
 ENV MODEL_PATH=/models
-ENTRYPOINT ["bun", "run", "src/index.ts"]
+ENTRYPOINT ["bun", "dev"]
